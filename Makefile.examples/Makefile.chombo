@@ -1,0 +1,8 @@
+#  Flags for linking to hypre 
+#  In this example hypre is installed in the same directory as LibPFASST
+
+CHOMBO_DIR = /Users/emmaliu/internship2022/installs/Chombo/lib
+
+#  The location of include and libHYPRE.a can vary
+FFLAGS  += -I$(CHOMBO_DIR)/include
+#LDFLAGS += -lstdc++ $(CHOMBO_DIR)/libbasetools2d.Darwin.64.mpicxx.gfortran.DEBUG.MPI.a

@@ -1,0 +1,33 @@
+!
+!  Test parameters to run the Dahlquist example with just SDC
+!
+!  If run in serial, this will be SDC
+!  If run in parallel, this will be pipelined SDC
+
+&PF_PARAMS
+   !  Internal pfasst variable that must be set
+   nlevels  = 1
+
+   !  These are internal pfasst variables that can be reset
+   nnodes =  5     !  Number of quadrature nodes (default is 3)
+
+   niters = 10     !  Max PFASST iterations default is 5
+ 
+    !  optional variables to control termination  (defaults are 0.0)
+    abs_res_tol = 1.d-13
+    rel_res_tol = 1.d-13
+
+    !  Variable to tell if Vcycling will be done.  Here there is only one level
+    Vcycle=.false.
+/
+
+!  Now define the local variables you need
+&PARAMS
+
+    Tfin = 1.0
+    nsteps = 32
+
+    lam1=1.0
+    lam2=-2.0
+
+/

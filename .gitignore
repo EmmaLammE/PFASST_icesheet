@@ -30,3 +30,39 @@
 *.exe
 *.out
 *.app
+*.defs
+fort.*
+*.out
+
+
+# data
+fftw*
+hdf5*
+gcc*
+xz*
+*.dat
+*.gif
+
+# python output files
+*.pyc
+*.pkl
+*.npy
+
+# specific folders
+lib/
+build/
+include/
+staging/
+src/pf_version.f90
+/.project
+
+test/*/build
+test/*/include
+test/*/output
+test/output
+latex
+html
+final_solution
+.pytest_cache
+/TAGS
+*.ipynb_checkpoints

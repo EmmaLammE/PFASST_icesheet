@@ -1,0 +1,90 @@
+#
+# Makefile rules for compiling examples.
+#
+
+vpath %.f90 $(VPATHS)
+vpath %.c   $(VPATHS)
+vpath %.f   $(VPATHS)
+
+$(EXE): $(OBJ)
+ifeq ($(MKVERBOSE),TRUE)
+	$(info output_file is $(OUTPUT_OPTION))
+	$(FC) $(FFLAGS) $(FFLAGS_EXTRA)  $^ $(OUTPUT_OPTION) $(LDFLAGS)
+else
+	@echo "Linking..."
+	$(info output_file is $(OUTPUT_OPTION))
+	@$(FC) $(FFLAGS) $(FFLAGS_EXTRA)  $^ $(OUTPUT_OPTION) $(LDFLAGS)
+endif
+
+build/%.o build/%.mod: %.f90
+	#@echo "current pwd is $(PWD)"
+	@mkdir -p build
+	@mkdir -p include
+
+ifeq ($(MKVERBOSE),TRUE)
+	$(FC) $(FFLAGS) $(FFLAGS_EXTRA) -c  $< $(OUTPUT_OPTION)
+else
+	@echo "Building $<..."
+	@$(FC) $(FFLAGS) $(FFLAGS_EXTRA) -c  $< $(OUTPUT_OPTION)
+endif
+
+build/%.o: %.c
+	@mkdir -p build
+	@mkdir -p include
+
+ifeq ($(MKVERBOSE),TRUE)
+	$(CC) $(CFLAGS) -c $< $(OUTPUT_OPTION)
+else
+	@echo "Building $<..."
+	@$(CC) $(CFLAGS) -c $< $(OUTPUT_OPTION)
+endif
+
+build/%.o: %.f
+	@mkdir -p build
+	@mkdir -p include
+ifeq ($(MKVERBOSE),TRUE)
+	$(FC) $(FFLAGS_EXTRA) -c -w $< $(OUTPUT_OPTION)
+else
+	@echo "Building $<..."
+	@$(FC) $(FFLAGS_EXTRA) -c -w $< $(OUTPUT_OPTION)
+endif
+
+.PHONY: clean depend
+
+clean:
+	\rm -f *.exe
+	\rm -rf  build
+	\rm -f fort.* *.slog2 *.edf *.trc gmon.out
+	\rm -rf include
+	\rm -f lib/*.a
+
+
+#  We can use this to build a new dependency file.  If makedepf90 is installed  type "make depend"
+depend $(PWD)/.depend:
+	makedepf90 -b ./build  $(FSRC) > .depend
+
+
+include $(LIBPFASST)/.depend
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
