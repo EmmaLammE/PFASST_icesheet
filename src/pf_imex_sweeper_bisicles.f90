@@ -98,11 +98,11 @@ contains
 
     lev => pf%levels(level_index)   !  Assign level pointer
     
-    !c_AmrIceHolderPtr=pf%cptr_AmrIceHolder
+    c_AmrIceHolderPtr=pf%cptr_AmrIceHolder
     !pf_bisicles => cast_as_pf_bisicles_t(pf)
 
-    print *,'pf_imex_bisicles_sweeper.f90 0000 c_AmrIceHolderPtr ', c_AmrIceHolderPtr
-    call ABORT
+    !print *,'pf_imex_bisicles_sweeper.f90 0000 c_AmrIceHolderPtr ', c_AmrIceHolderPtr
+    !call ABORT
     !print *, '------ adding rhs to q !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 1'
     sweeps: do k = 1,nsweeps   !!  Loop over sweeps
        pf%state%sweep=k
@@ -147,7 +147,7 @@ contains
           call lev%Q(1)%copy(lev%q0)
           if (this%explicit) then
              call pf_start_timer(pf,T_FEVAL,level_index)
-             !print *,'imex_sweeper_bisicles 1111111 '
+             !print *,'imex_sweeper_bisicles 222222222 '
              call this%f_eval(lev%Q(1), t0, level_index, lev%F(1,1),c_AmrIceHolderPtr)
              call pf_stop_timer(pf,T_FEVAL,level_index)
           end if
