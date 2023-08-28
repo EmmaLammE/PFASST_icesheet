@@ -58,7 +58,6 @@ contains
     call restrict_ts(f_lev, c_lev, f_lev%Q, c_lev%Q, f_times, flags)
 
     !>  Recompute the functions
-    !print *,'pf_restrict 11111 '
     !call pf%levels(level_index-1)%Q(2)%eprint()
     call c_lev%ulevel%sweeper%evaluate_all(pf,level_index-1, c_times, flags=flags, step=step)
 
@@ -140,9 +139,9 @@ contains
     integer :: f_nnodes,c_nnodes
 
 
-    f_nnodes = f_lev%nnodes
-    c_nnodes = c_lev%nnodes
-
+    f_nnodes = f_lev%nnodes ! num of SDC nodes on fine level (can think of num of time steps)
+    c_nnodes = c_lev%nnodes ! num of SDC nodes on coarse level (can think of num of time steps)
+   !  print *, 'EL DEBUG --        restrict ts, f_nnodes:', f_nnodes, 'c_nnodes:',c_nnodes
     !!  Create a temp array for the spatial restriction
     if (f_lev%restrict_workspace_allocated   .eqv. .false.) then      
        call c_lev%ulevel%factory%create_array(f_lev%f_encap_array_c, f_nnodes, c_lev%index, c_lev%lev_shape)
@@ -158,7 +157,7 @@ contains
        !call f_lev%f_encap_array_c(m)%eprint()
     end do
 
-    ! temporal restriction
+    ! temporal restriction, rmat is calculated in pf_time_interpolation_matrix in pf_pfasst.f90
     if (present(flags)) then
        if ((flags .eq. 0) .or. (flags .eq. 1)) &
             call pf_apply_mat(c_encap_array, 1.0_pfdp, f_lev%rmat, f_lev%f_encap_array_c, .true., flags)
@@ -196,7 +195,7 @@ contains
        f_lev%restrict_workspace_allocated  = .true.
     end if
 
-    !  spatial restriction
+    !  spatial restriction, this restrict function is at user level in bisicle folder
     do m = 1, f_nnodes-1
        call f_lev%ulevel%restrict(f_lev, c_lev, f_encap_array(m), f_lev%f_encap_array_c(m), f_time(m), flags)
        !print *, '                    in restrict_ts_spatial after copy f_ecanp_array, f_lev%f_encap_array_c(m)'

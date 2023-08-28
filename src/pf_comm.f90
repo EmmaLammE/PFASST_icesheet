@@ -123,12 +123,12 @@ contains
 
  end subroutine pf_recv_status
  
-  !>  Subroutine to send the solution to the next processor
+  !>  Subroutine to send the solution to the next processor, 0->1
   subroutine pf_send(pf, level, tag, blocking, dir,which,stride)
     type(pf_pfasst_t), intent(inout) :: pf
     class(pf_level_t),  intent(inout) :: level
     integer,           intent(in)    :: tag
-    logical,           intent(in)    :: blocking
+    logical,           intent(in)    :: blocking ! false
     integer, optional, intent(in)    :: dir
     integer, optional, intent(in)    :: which
     integer, optional, intent(in)    :: stride
@@ -150,12 +150,13 @@ contains
     if(present(which)) which_ = which
     if(present(stride)) stride_ = stride
     if(abs(dir_) .gt. 1) call pf_stop(__FILE__,__LINE__,'bad value for dir',val=dir_,rank=rank)
+    print*,'       in sending, rank ',pf%rank,', blocking ',blocking,', dir_ ' ,dir_,', stride_ ',stride_,',pf%comm%nproc ',pf%comm%nproc
 
     ! need to wait here to make sure last non-blocking send is done
     if(blocking .eqv. .false.) then
 
        if (pf%debug) print  '("DEBUG-rank=", I5, " begin wait, level=",I4)',rank,level%index
-
+       print *, '       in sending, waiting for last block to be done'
        call pf_start_timer(pf, T_WAIT, level%index)
        call pf%comm%wait(pf, level%index, ierr)       
        call pf_stop_timer(pf, T_WAIT, level%index)
@@ -221,9 +222,10 @@ contains
 
 
     if (pf%debug) print '("DEBUG-rank=",I5," begin recv, blocking=",L4," tag=",I8," pstatus=", I2)',rank,blocking,tag,pstatus
+    print*,'       in receiving, rank ',pf%rank,', blocking ',blocking,', dir_ ' ,dir_,', stride_ ',stride_,',pf%comm%nproc ',pf%comm%nproc
 
     source=pf%rank-(dir_)*(stride_)
-    if (source < 0  .or. source > pf%comm%nproc-1) return 
+    if (source < 0  .or. source > pf%comm%nproc-1) return ! if more than 1 rank, rank 0 will return here
 
     if (blocking)  then
        ntimer=T_RECEIVE
@@ -233,16 +235,17 @@ contains
     end if
     
     call pf_start_timer(pf, ntimer, level%index)
-    call pf%comm%recv(pf, level,tag, blocking, ierr, source)
+    call pf%comm%recv(pf, level,tag, blocking, ierr, source) ! recv in pf_mpi_recv in pf_mpi.f90
     call pf_stop_timer(pf, ntimer, level%index)
     
     if (ierr .ne. 0) call pf_stop(__FILE__,__LINE__,'error during receive, ierr',val=ierr,rank=pf%rank)
     if (pf%debug) print*,  'DEBUG --',pf%rank, 'end recv', SIZE(level%recv)
     
-    !  Unpack solution
+    !  Unpack solution, only rank >=1 will got here and unpack solutions
+   !  print *, '       in receiving, dir_ ', dir_, ', which ',which_,', level%recv ',level%recv ! level%recv is the received soln
     call pf_start_timer(pf, T_UNPACK, level%index)
-    if (dir_ == 1) then
-       call level%q0%unpack(level%recv, which_)
+    if (dir_ == 1) then ! dir = 1, which =1, level%recv is the H vector
+       call level%q0%unpack(level%recv, which_) ! q0 is the this in unpack
     else
        call level%qend%unpack(level%recv, which_)
     end if

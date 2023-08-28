@@ -98,11 +98,11 @@ contains
 
     lev => pf%levels(level_index)   !  Assign level pointer
     
-    !c_AmrIceHolderPtr=pf%cptr_AmrIceHolder
+    c_AmrIceHolderPtr=pf%cptr_AmrIceHolder
     !pf_bisicles => cast_as_pf_bisicles_t(pf)
 
-    print *,'pf_imex_bisicles_sweeper.f90 0000 c_AmrIceHolderPtr ', c_AmrIceHolderPtr
-    call ABORT
+    !print *,'pf_imex_bisicles_sweeper.f90 0000 c_AmrIceHolderPtr ', c_AmrIceHolderPtr
+    !call ABORT
     !print *, '------ adding rhs to q !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 1'
     sweeps: do k = 1,nsweeps   !!  Loop over sweeps
        pf%state%sweep=k
@@ -142,7 +142,7 @@ contains
        end if
        
        !  Recompute the first function value if this is first sweep
-       if (k .eq. 1) then
+       if (k .eq. 1) then ! k=1
           !print *,'imex_sweeper_bisicles 1111111 '
           call lev%Q(1)%copy(lev%q0)
           if (this%explicit) then
@@ -158,12 +158,13 @@ contains
              call pf_stop_timer(pf,T_FEVAL,level_index)
           end if
        end if
+      !  print *, '  sweeper Recompute the first function value'
 
        t = t0
        ! do the sub-stepping in sweep
 
        substeps: do m = 1, lev%nnodes-1  !!  Loop over substeps
-       !print *, '------ adding rhs to q !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 2 m',m
+      !  print *, '  sweeper ------ adding rhs to q !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 2 m',m
           t = t + dt*this%dtsdc(m)
 
           this%m_sub=m
@@ -178,10 +179,10 @@ contains
                   call this%rhs%axpy(dt*this%QtilI(m,n), lev%F(n,2))
           end do
           !>  Add the integral term
-          !print *, '    before adding lev%I '
-          !call lev%I(m)%eprint()
-          !call this%rhs%eprint()
-          call this%rhs%axpy(1.0_pfdp, lev%I(m))
+         !  print *, '  sweeper before adding lev%I '
+         !  call lev%I(m)%eprint()
+         !  call this%rhs%eprint()
+         !  call this%rhs%axpy(1.0_pfdp, lev%I(m))
           !call this%rhs%eprint()
 
           !>  Add the starting value
@@ -209,22 +210,25 @@ contains
              !call ABORT
           end if
           !>  Compute explicit function on new value
+         !  print *, '  sweeper before f_eval'
           if (this%explicit) then
-             !print *,'imex_sweeper_bisicles 22222 '
+            !  print *,'  sweeper level index ',level_index
              call pf_start_timer(pf,T_FEVAL,level_index)
              call this%f_eval(lev%Q(m+1), t, level_index, lev%F(m+1,1),c_AmrIceHolderPtr)
              call pf_stop_timer(pf,T_FEVAL,level_index)
           end if
+          
             
 
        end do substeps !!  End substep loop
-       
+      !  print *, '  sweeper end of substeps'
        call pf_residual(pf, level_index, dt)
-       !print *,'imex_sweeper_bisicles 33333 '
+      !  print *, '  sweeper done pf_residuals'
        call lev%qend%copy(lev%Q(lev%nnodes))
        call pf_stop_timer(pf, T_SWEEP,level_index)
-
+      !  print *, '  sweeper calling hooks'
        call call_hooks(pf, level_index, PF_POST_SWEEP)
+      !  print *, '  sweeper done calling hooks'
     end do sweeps  !  End loop on sweeps
 
   end subroutine imex_bisicles_sweep
@@ -405,7 +409,7 @@ contains
 
     type(pf_level_t),    pointer :: lev
     lev => pf%levels(level_index)   !!  Assign level pointer
-    !  Do nothing now
+    !  Do nothing now, only example of compute dt is in pf_verlet_sweeper.f90 in pfasst
     return
   end subroutine imex_bisicles_compute_dt
 

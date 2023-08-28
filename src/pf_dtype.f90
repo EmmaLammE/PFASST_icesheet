@@ -292,7 +292,7 @@ module pf_mod_dtype
 
      ! --  run options  (should be set before pfasst_run is called)
      logical :: Vcycle = .true.         !!  decides if Vcycles are done
-     logical :: use_pysdc_V = .false.         !!  decides if Vcycles are done
+     logical :: use_pysdc_V = .false.   !!  decides if Vcycles are done
      logical :: sweep_at_conv = .false. !!  decides if one final sweep after convergence is done
      logical :: Finterp = .false.    !!  True if transfer functions operate on rhs
      logical :: use_LUq = .true.     !!  True if LU type implicit matrix is used
@@ -309,7 +309,7 @@ module pf_mod_dtype
      logical :: RK_pred = .false.         !!  true if the coarse level is initialized with Runge-Kutta instead of PFASST
 
      ! -- misc
-     logical :: debug = .false.         !!  If true, debug diagnostics are printed
+     logical :: debug = .False.         !!  If true, debug diagnostics are printed
 
      ! -- controller for the results 
      logical :: save_residuals = .true.  !!  Will save residuals every time they are set
@@ -319,7 +319,7 @@ module pf_mod_dtype
      integer :: save_timings  = 2        !!  0=none, 1=total only, 2=all, 3=all and echo
      integer :: save_solutions  = 0      !!  0=none, 1=end, 2=all time steps, 3=all iterations
 
-     integer :: rank    = -1            !! rank of current processor
+     integer :: rank    = -1            !! rank of current processor, or id of current proc
 
      !> pf objects
      type(pf_state_t), allocatable :: state   !!  Describes where in the algorithm  is

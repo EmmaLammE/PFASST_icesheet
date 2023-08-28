@@ -14,6 +14,7 @@ module pf_mod_parallel
   use pf_mod_hooks
   use pf_mod_comm
   use pf_mod_results
+  use omp_lib
   implicit none
 contains
 
@@ -56,8 +57,9 @@ contains
         call pf_stop(__FILE__,__LINE__,'Invalid nsteps=',nsteps)
       end if
     end if
-    pf%state%nsteps = nsteps_loc
-
+    pf%state%nsteps = nsteps_loc ! this nsteps_loc should be numCrseIntervals from bisicles
+   !  print *, 'pfasst run, before initializing, tend ', tend,', dt ',dt,', nsteps_loc ',nsteps_loc
+   !  call pf%levels(pf%state%finest_level)%Q(1)%eprint()
     !>  Allocate stuff for holding results
     call initialize_results(pf)
 
@@ -69,9 +71,12 @@ contains
 
     call pf_start_timer(pf, T_TOTAL)
 
+   !  qend is initialized in bisicle case in pfasst_main.f90
+   !  print *, "starting pf_block run"
     if (present(qend)) then
        call pf_block_run(pf, q0, dt, nsteps_loc,qend=qend,flags=flags)
     else
+      !  print *, 'qend not present'
        call pf_block_run(pf, q0, dt,  nsteps_loc,q0,flags=flags)
     end if
 
@@ -95,11 +100,11 @@ contains
   !
   !> PFASST Predictor.
   !>  Subroutine  to initialize the solution on each processor
-  !!  The goal is to have a solution at each level and each node set to a consistent value
+  !!  The goal is to have a solution at each time level and each node set to a consistent value
   !!  When this is called, the value of q0 at the fine level on each processor has been set somehow (see q0_style below)
   !!
   !! This can be broken down into four substeps
-  !! 1. Get the  initial condition on the finest level at each node
+  !! 1. Get the  initial condition on the finest level at each time node
   !! 2. Coarsen the initial condition to each coarser level with tau corrections
   !! 3. Do the "Burn in" step on the coarse level to make the coarse values consistent
   !!    (this is skipped if the fine initial conditions are already consistent)
@@ -144,7 +149,7 @@ contains
 
     call call_hooks(pf, 1, PF_PRE_PREDICTOR)
     call pf_start_timer(pf, T_PREDICTOR)
-
+   ! print *,'in predictor'
     if (pf%debug) print*, 'DEBUG --', pf%rank, 'beginning predictor'
     f_lev => pf%levels(pf%state%finest_level)
     !! Step 0.  Pick the time step for this block
@@ -153,9 +158,11 @@ contains
     !! Step 1. Getting the  initial condition on the finest level at each processor
     !!         If we are doing multiple levels, then we need to coarsen to fine level
     if (pf%q0_style < 2) then  !  Spread q0 to all the nodes
-    !print *,'pf_parallel 11111 '
+   !  print *,'pf_parallel spreading q0 '
        call f_lev%ulevel%sweeper%spreadq0(pf,pf%state%finest_level, t0)
     endif
+   !  print *,'pf_parallel done spreading q0 '
+
     !!  Step 1.5  Compute the time step for this block given the initial q0 and function values
     
 !    if (pf%nlevels==1) return
@@ -164,29 +171,31 @@ contains
     if (pf%debug) print*,  'DEBUG --', pf%rank, 'do coarsen  in predictor'
     if (pf%state%finest_level > 1) then ! fine level=3
        do level_index = pf%state%finest_level, 2, -1
-       !print *,'pf_parallel 22222 -------------------------------------------------- level #', level_index
+      !  print *,'pf_parallel level_index ', level_index, 'fine level ',pf%state%finest_level
           f_lev => pf%levels(level_index) ! l_lev%Q(1),Q(2)=32, correct
           c_lev => pf%levels(level_index-1) ! c_lev%Q(1)=32,c_lev%q0=32, incorrect
-          call pf_residual(pf, f_lev%index, dt,0)
+          call pf_residual(pf, f_lev%index, dt,0) ! correct till here
 
-          !print *, 'after updating residual lev%R, f_lev%R(2) c_lev%R(2) size ', SIZE(f_lev%R),SIZE(c_lev%R)
-          !call f_lev%R(2)%eprint()
-          !call c_lev%R(2)%eprint()
-          !print *, '        size of f_lev%Q,  c_lev%Q ', SIZE(f_lev%Q),SIZE(c_lev%Q)
-          !call f_lev%Q(2)%eprint()
-          !call c_lev%Q(2)%eprint()
+         !  print *, 'parallel after updating residual lev%R, f_lev%R(2) size ', SIZE(f_lev%R),SIZE(c_lev%R)
+         !  call f_lev%R(2)%eprint()
+         !  print *, '  c_lev%R(2)'
+         !  call c_lev%R(1)%eprint()
+         !  print *, '        size of f_lev%Q,  c_lev%Q ', SIZE(f_lev%Q),SIZE(c_lev%Q)
+         !  call f_lev%Q(2)%eprint()
+         !  call c_lev%Q(2)%eprint()
           !print *,'pf_parallel 3333333 '
           call f_lev%ulevel%restrict(f_lev, c_lev, f_lev%q0, c_lev%q0, t0)
-          !call c_lev%R(2)%eprint()
-          !print *,'pf_parallel.f90 --------- before restrict_fas pf%state%finest_level',pf%state%finest_level,'level_index',level_index
+         !  call c_lev%R(1)%eprint()
+         !  print *,'parallel --------- before restrict_fas pf%state%finest_level',pf%state%finest_level,'level_index',level_index
           
-          !print *, 'before restrict_time_space_fas, f_lev%tauQ(2) c_lev%tauQ(2)'
-          !call f_lev%tauQ(2)%eprint()
-          !call c_lev%tauQ(2)%eprint()
+         !  print *, 'before restrict_time_space_fas, f_lev%tauQ(2) c_lev%tauQ(2)', allocated(f_lev%tauQ), allocated(c_lev%tauQ)
+         !  call f_lev%tauQ(1)%eprint()
+         !  call c_lev%tauQ(1)%eprint()
           call restrict_time_space_fas(pf, t0, dt, level_index)  !  Restrict
-          !print *, 'after restrict_time_space_fas, f_lev%tauQ(1) c_lev%tauQ(1)', SIZE(f_lev%tauQ),SIZE(c_lev%tauQ)
-          !call f_lev%tauQ(1)%eprint()
-          !call c_lev%tauQ(1)%eprint()
+         !  print *, 'parallel after restrict_time_space_fas, f_lev%tauQ(1) c_lev%tauQ(1)', SIZE(f_lev%tauQ),SIZE(c_lev%tauQ)
+         !  call f_lev%tauQ(1)%eprint()
+         !  call c_lev%tauQ(1)%eprint()
+         !  call EXIT(0)
           if (level_index .EQ. 1) then
             call ABORT
           end if
@@ -205,12 +214,13 @@ contains
     !! The first processor does nothing, the second does one set of sweeps, the third two, etc
     !! Hence, this is skipped completely if nprocs=1
     if (pf%debug) print*,  'DEBUG --', pf%rank, 'do burnin  in predictor'
-    if (pf%q0_style .eq. 0) then  !  The coarse level needs burn in
+   !  print *, 'in step 2 q0_style ',pf%q0_style
+    if (pf%q0_style .eq. 0) then  !  The coarse level needs burn in, pf%q0_style=0
        !! If RK_pred is true, just do some RK_steps
-       if (pf%RK_pred) then  !  Use Runge-Kutta to get the coarse initial data
+      ! print *, 'parallel RK_pred ',pf%RK_pred
+       if (pf%RK_pred) then  !  Use Runge-Kutta to get the coarse initial data, pf%RK_pred=false
           !  Get new initial conditions
           call pf_recv(pf, c_lev, 100000+pf%rank, .true.)
-
           !  Do a RK_step
           call c_lev%ulevel%stepper%do_n_steps(pf, level_index,t0, c_lev%q0,c_lev%qend, dt, 1)       
           !  Send forward
@@ -218,7 +228,8 @@ contains
        else  !  Normal PFASST burn in
           level_index=1
           c_lev => pf%levels(level_index)
-          do k = 1, pf%rank 
+         !  print *, 'parallel pf%rank ',pf%rank
+          do k = 1, pf%rank ! if only 1 proce, rank is 0. if more than 1 proc, rank gonna be 0,1,2...
              pf%state%iter = -k
              ! Remember t0=(pf%rank)*dt is the beginning of this time slice so
              ! t0-(pf%rank)*dt is 0             
@@ -227,6 +238,7 @@ contains
                                                 ! for optimal control problem t, t0k has no influence on f_eval, so there this does something else
 
              ! Get new initial value (skip on first iteration)
+            !  print *, 'parallel pf%rank ',pf%rank, ', k ', k
              if (k > 1) then
                 call c_lev%q0%copy(c_lev%qend,flags=0)
                 ! If we are doing PFASST_pred, we use the old values at nodes, otherwise spread q0
@@ -235,31 +247,34 @@ contains
                 end if
              end if
              !  Do some sweeps
-             if (pf%debug) print *,'sweep at pred 3,lev=',level_index  
-             print *,'pf_parallel 33333 get into sweep  !!!!!!!!!!'           
+            !  print *,'parallel sweep at pred 3,lev=',level_index  
+            !  print *,'pf_parallel 33333 get into sweep  !!!!!!!!!!'           
              call c_lev%ulevel%sweeper%sweep(pf, level_index, t0k, dt,pf%nsweeps_burn)
-          end do
-       endif  !  RK_pred
-    end if  ! (q0_style .eq. 0)
-
+          end do ! k = 1, pf%rank
+       endif  !  RK_pred or PFASST burn in, PFASST burn in
+    end if  ! (q0_style .eq. 0) true
+   !  print *, 'parallel ----------- done step 3 in predictor -----------------------'
     !!
     !! Step 4: Now we have everyone burned in, so do some coarse sweeps
     if (pf%state%finest_level > 1) then
        if (pf%debug) print*,  'DEBUG --', pf%rank, 'do sweeps  in predictor', 'Pipeline_pred',pf%Pipeline_pred
        pf%state%pstatus = PF_STATUS_ITERATING
        pf%state%status = PF_STATUS_ITERATING
-       if (pf%Pipeline_pred) then
+      !  print *, " pf%Pipeline_pred ",pf%Pipeline_pred
+       if (pf%Pipeline_pred) then ! pf%Pipeline_pred = true
           do k = 1, c_lev%nsweeps_pred
              pf%state%iter =-(pf%rank + 1) -k
 
              !  Get new initial conditions
              call pf_recv(pf, c_lev, c_lev%index*110000+pf%rank+k, .true.)
-
+            !  print *, 'parallel received new IC'
              !  Do a sweep
              if (pf%debug) print*,  'DEBUG --',pf%rank,'sweep at pred 4,lev=',level_index             
              call c_lev%ulevel%sweeper%sweep(pf, level_index, t0, dt, 1)
              !  Send forward
+            !  print *, 'parallel sending new IC in rank ',pf%rank
              call pf_send(pf, c_lev,  c_lev%index*110000+pf%rank+1+k, .false.)
+            !  print *, 'parallel sent new IC in rank ',pf%rank
           end do ! k = 1, c_lev%nsweeps_pred-1
        else  !  Don't pipeline
           if (c_lev%nsweeps_pred .gt. 0) then
@@ -272,14 +287,16 @@ contains
              call pf_send(pf, c_lev,  c_lev%index*110000+pf%rank+1, .false.)
           endif
        endif  ! (Pipeline_pred .eq. .true) then
-    end if
-
+    end if ! (pf%state%finest_level > 1) then
+   !  print *, '----------- done step 4 in predictor -----------------------'
     if (pf%debug) print*,  'DEBUG --', pf%rank, 'returning to fine level in predictor'
     !!
     !!  Step 5:  Return to fine level sweeping on any level in between coarsest and finest
+   !  print *,'parallel before step 5, pf%state%finest_level ',pf%state%finest_level
     do level_index = 2, pf%state%finest_level  !  Will do nothing with one level
        f_lev => pf%levels(level_index);
        c_lev => pf%levels(level_index-1)
+      !  print *,'parallel before interp time space '
        call interpolate_time_space(pf, t0, dt, level_index, c_lev%Finterp)
        call f_lev%qend%copy(f_lev%Q(f_lev%nnodes), flags=0)
        if (pf%rank /= 0) call interpolate_q0(pf, f_lev, c_lev,flags=0)
@@ -291,7 +308,7 @@ contains
 !       end if
     end do 
     pf%state%iter   = 0
-
+   !  print *, '----------- done step 5 in predictor -----------------------'
     call pf_stop_timer(pf, T_PREDICTOR)
     call call_hooks(pf, -1, PF_POST_ITERATION)
 
@@ -413,10 +430,10 @@ contains
 
     !  Stick the initial condition into q0 (will happen on all processors)
     call lev%q0%copy(q0, flags=0) ! lev%q0 is passed in from y_0 in main correctly
-
+   !  print *,' block run, copy IC into q0 '
+   !  call lev%Q(1)%eprint()
     nproc = pf%comm%nproc
     nblocks = nsteps/nproc
-
     !  Decide what the coarsest level in the V-cycle is
     level_index_c=1
     if (.not. pf%Vcycle)     level_index_c=pf%state%finest_level
@@ -445,6 +462,7 @@ contains
        pf%state%pfblock = k
        pf%state%sweep = 1
 
+      !  print *, 'k',k,', nproc',nproc,', lev%send '
        if (k > 1) then
           if (nproc > 1)  then
              call lev%qend%pack(lev%send)    !!  Pack away your last solution
@@ -453,7 +471,7 @@ contains
           else
              call lev%q0%copy(lev%qend, flags=0)    !!  Just stick qend in q0
           end if
-
+         !  print *, "done unpacking"
           !>  Update the step and t0 variables for new block
           pf%state%step = pf%state%step + pf%comm%nproc
           pf%state%t0   = pf%state%step * dt
@@ -461,7 +479,7 @@ contains
 
        !> Call the predictor to get an initial guess on all levels and all processors
        call pf_predictor(pf, pf%state%t0, dt, flags)
-
+      !  print *, 'done pf_predictor'
        !>  Start the loops over SDC sweeps
        pf%state%iter = 0
        call pf_set_resid(pf,lev%index,lev%residual)
@@ -477,8 +495,10 @@ contains
 
           !  Do a V-cycle
           if (pf%use_pySDC_V) then
+             if (pf%debug) print*, 'EL DEBUG --        using SDC V cycle'
              call pf_Vcycle_pySDC(pf,k,pf%state%t0,dt,level_index_c, pf%state%finest_level)
           else
+             if (pf%debug) print*, 'EL DEBUG --        not using SDC V cycle'
              call pf_Vcycle(pf, k, pf%state%t0, dt, level_index_c, pf%state%finest_level)
           end if
           
@@ -547,8 +567,8 @@ contains
     do level_index = level_index_f, level_index_c+1, -1
        f_lev => pf%levels(level_index);
        c_lev => pf%levels(level_index-1)
-
-       if (pf%debug) print*,  'DEBUG --',pf%rank,'sweep at beginning of Vycle lev=',level_index
+       if (pf%debug) print*, 'EL DEBUG --        level index: ',level_index, ', f_lev: ',level_index, 'c_lev: ',level_index-1
+      !  if (pf%debug) print*,  'DEBUG --',pf%rank,'sweep at beginning of Vycle lev=',level_index
        call f_lev%ulevel%sweeper%sweep(pf, level_index, t0, dt, f_lev%nsweeps)
        call pf_send(pf, f_lev, level_index*10000+iteration, .false.)
        call restrict_time_space_fas(pf, t0, dt, level_index)

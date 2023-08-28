@@ -41,7 +41,6 @@ contains
     else                           !!  fname not present, only call read_opts if we want command line read
        if (read_cmd) call pf_read_opts(pf, read_cmd)
     end if
-
     !>  set communicator
     pf%comm => comm
 
@@ -88,7 +87,6 @@ contains
     pf%outdir       = trim(pf%outdir)//trim(dirname)
     ierr= system('mkdir -p dat/' // trim(pf%outdir))
     if (ierr .ne. 0) call pf_stop(__FILE__,__LINE__, "Cannot make base directory")    
-
   end subroutine pf_pfasst_create
 
   !> Helper routine to set the size and mpi buffer length for regular grids
@@ -126,10 +124,13 @@ contains
     do l = 1, pf%nlevels
        call pf_level_setup(pf, l)
     end do
+   !  print *, '   pf_set_up, after level set up'
+   !  call pf%levels(pf%nlevels)%Q(1)%eprint()
     !>  set default finest level
     pf%state%finest_level=pf%nlevels
     !>  Loop over levels setting interpolation and restriction matrices (in time)
     do l = pf%nlevels, 2, -1
+      !  print *, ' in pf_set_up, level ',l
        f_lev => pf%levels(l); c_lev => pf%levels(l-1)
        allocate(f_lev%tmat(f_lev%nnodes,c_lev%nnodes),stat=ierr)
        if (ierr /= 0)  call pf_stop(__FILE__,__LINE__,"allocate fail",f_lev%nnodes)
@@ -181,8 +182,9 @@ contains
     lev%residual = -1.0_pfdp
 
     !> (re)allocate tauQ 
+   !  print *, 'pf_setup allocate tauQ level_index ',level_index,', lev%index ',lev%index,', allocated(lev%tauQ) ',allocated(lev%tauQ)
     if ((lev%index < pf%nlevels) .and. (.not. allocated(lev%tauQ))) then
-       call lev%ulevel%factory%create_array(lev%tauQ, nnodes-1, lev%index,  lev%lev_shape)
+       call lev%ulevel%factory%create_array(lev%tauQ, nnodes-1, lev%index,  lev%lev_shape) ! in bisicles_create_array
     end if
     !> skip the rest if we're already allocated
     if (lev%allocated) return

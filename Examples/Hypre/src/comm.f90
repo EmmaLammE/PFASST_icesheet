@@ -29,7 +29,7 @@ contains
     if (space_dim .eq. 2) then
        nspace_real = sqrt(real(nspace))
        if (nspace_real .ne. nint(nspace_real)) then
-          print'(a)', 'ERROR: create_simple_communicators: nspace must be perfect square.'
+          print'(a)', 'aaaa ERROR: create_simple_communicators: nspace must be perfect square.'
           stop
        end if
     end if

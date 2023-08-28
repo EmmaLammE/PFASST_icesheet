@@ -12,7 +12,7 @@ FFLAGS = -Ibuild -Jinclude -cpp -ffree-line-length-none -fallow-argument-mismatc
 # FFLAGS = -fallow-argument-mismatch
 
 ifeq ($(DEBUG),TRUE)
-FFLAGS += -fcheck=all -fbacktrace -g -ffpe-trap=invalid,zero,overflow -fbounds-check -fimplicit-none -ffree-line-length-none
+FFLAGS += -fcheck=all -fbacktrace -Wall -g -ffpe-trap=invalid,zero,overflow -fbounds-check -fimplicit-none -ffree-line-length-none
 else
 FFLAGS += -O3 
 endif
