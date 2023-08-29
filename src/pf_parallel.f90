@@ -434,6 +434,7 @@ contains
    !  call lev%Q(1)%eprint()
     nproc = pf%comm%nproc
     nblocks = nsteps/nproc
+   !  print *,'in pf_parallel rank ',pf%rank,', nproc ',nproc,', nblocks ',nblocks
     !  Decide what the coarsest level in the V-cycle is
     level_index_c=1
     if (.not. pf%Vcycle)     level_index_c=pf%state%finest_level

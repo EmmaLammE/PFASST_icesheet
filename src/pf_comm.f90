@@ -150,13 +150,13 @@ contains
     if(present(which)) which_ = which
     if(present(stride)) stride_ = stride
     if(abs(dir_) .gt. 1) call pf_stop(__FILE__,__LINE__,'bad value for dir',val=dir_,rank=rank)
-    print*,'       in sending, rank ',pf%rank,', blocking ',blocking,', dir_ ' ,dir_,', stride_ ',stride_,',pf%comm%nproc ',pf%comm%nproc
+   !  print*,'       in sending, rank ',pf%rank,', blocking ',blocking,', dir_ ' ,dir_,', stride_ ',stride_,',pf%comm%nproc ',pf%comm%nproc
 
     ! need to wait here to make sure last non-blocking send is done
     if(blocking .eqv. .false.) then
 
        if (pf%debug) print  '("DEBUG-rank=", I5, " begin wait, level=",I4)',rank,level%index
-       print *, '       in sending, waiting for last block to be done'
+      !  print *, '       in sending, waiting for last block to be done'
        call pf_start_timer(pf, T_WAIT, level%index)
        call pf%comm%wait(pf, level%index, ierr)       
        call pf_stop_timer(pf, T_WAIT, level%index)
@@ -222,7 +222,7 @@ contains
 
 
     if (pf%debug) print '("DEBUG-rank=",I5," begin recv, blocking=",L4," tag=",I8," pstatus=", I2)',rank,blocking,tag,pstatus
-    print*,'       in receiving, rank ',pf%rank,', blocking ',blocking,', dir_ ' ,dir_,', stride_ ',stride_,',pf%comm%nproc ',pf%comm%nproc
+   !  print*,'       in receiving, rank ',pf%rank,', blocking ',blocking,', dir_ ' ,dir_,', stride_ ',stride_,',pf%comm%nproc ',pf%comm%nproc
 
     source=pf%rank-(dir_)*(stride_)
     if (source < 0  .or. source > pf%comm%nproc-1) return ! if more than 1 rank, rank 0 will return here
