@@ -17,8 +17,28 @@ USE_CHOMBO ?= FALSE
 
 
 #  File for compiler options
-include $(LIBPFASST)/Makefile.local
+# a bunch of common defs that often come in handy
+MACHINE := $(shell uname)
+UNAMEM := $(shell uname -m)
+UNAMEN := $(shell uname -n)
+WHO := $(shell whoami)
+THIS_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
+#see if there is a host specific file.
+HOST_DEFS := $(THIS_DIR)/Makefile.local.$(UNAMEN)
+
+#NERSC_HOST is more useful than UNAMEN on NERSC hosts....
+ifneq ($(NERSC_HOST),)
+HOST_DEFS := $(THIS_DIR)/Makefile.local.$(NERSC_HOST)
+endif
+
+$(info HOST_DEFS=$(HOST_DEFS))
+ifneq ($(wildcard $(HOST_DEFS)), )
+$(info including $(HOST_DEFS) )
+include $(HOST_DEFS)
+else
+include $(LIBPFASST)/Makefile.local
+endif
 
 VPATHS = $(LIBPFASST)/src
 LDFLAGS +=  -L$(LIBPFASST)/lib -lpfasst 
