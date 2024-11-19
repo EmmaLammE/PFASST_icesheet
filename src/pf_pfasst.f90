@@ -121,16 +121,17 @@ contains
     integer                   :: ierr                   !!  error flag
 
     !>  loop over levels to set parameters
+    print *, '   pf_set_up, before level set up'
     do l = 1, pf%nlevels
        call pf_level_setup(pf, l)
     end do
-   !  print *, '   pf_set_up, after level set up'
+    print *, '   pf_set_up, after level set up'
    !  call pf%levels(pf%nlevels)%Q(1)%eprint()
     !>  set default finest level
     pf%state%finest_level=pf%nlevels
     !>  Loop over levels setting interpolation and restriction matrices (in time)
     do l = pf%nlevels, 2, -1
-      !  print *, ' in pf_set_up, level ',l
+       print *, ' in pf_set_up, level ',l
        f_lev => pf%levels(l); c_lev => pf%levels(l-1)
        allocate(f_lev%tmat(f_lev%nnodes,c_lev%nnodes),stat=ierr)
        if (ierr /= 0)  call pf_stop(__FILE__,__LINE__,"allocate fail",f_lev%nnodes)
@@ -184,8 +185,10 @@ contains
     !> (re)allocate tauQ 
    !  print *, 'pf_setup allocate tauQ level_index ',level_index,', lev%index ',lev%index,', allocated(lev%tauQ) ',allocated(lev%tauQ)
     if ((lev%index < pf%nlevels) .and. (.not. allocated(lev%tauQ))) then
+      !  print *, 'pf_setup nnodes-1 ',nnodes-1,', lev%index ',lev%index
        call lev%ulevel%factory%create_array(lev%tauQ, nnodes-1, lev%index,  lev%lev_shape) ! in bisicles_create_array
     end if
+   !  print *, 'pf_setup done allocating tauQ'
     !> skip the rest if we're already allocated
     if (lev%allocated) return
     lev%allocated = .true.
@@ -214,30 +217,33 @@ contains
     end if
     if (pf%use_rk_stepper)  call lev%ulevel%stepper%initialize(pf,level_index)
     !>  Allocate space for solutions 
+   !  print *, "allocating solutions"
     call lev%ulevel%factory%create_array(lev%Q, nnodes, lev%index,  lev%lev_shape)
-
+    print *, "allocating sdc sweepers"
     !> allocate solution and function arrays for sdc sweepers
     if (pf%use_sdc_sweeper) then
        npieces = lev%ulevel%sweeper%npieces
        call lev%ulevel%factory%create_array(lev%I, nnodes-1, lev%index,  lev%lev_shape)
 
        !  Space for function values
+       print *, "   allocating function values"
        call lev%ulevel%factory%create_array(lev%Fflt, nnodes*npieces, lev%index,  lev%lev_shape)
        do i = 1, nnodes*npieces
-          !print *,'pf_pfasst 0000 before setting val, nnodes',nnodes,'npieces',npieces
+          print *,'pf_pfasst 0000 before setting val, nnodes',nnodes,'npieces',npieces
           call lev%Fflt(i)%setval(0.0_pfdp, 0)
-          !print *,'pf_pfasst 0000 after setting val'
+         !  print *,'pf_pfasst 0000 after setting val'
        end do
        lev%F(1:nnodes,1:npieces) => lev%Fflt
 
        !  Need space for old function values in im sweepers
+       print *, "   allocating old function values"
        call lev%ulevel%factory%create_array(lev%pFflt, nnodes*npieces, lev%index, lev%lev_shape)
        lev%pF(1:nnodes,1:npieces) => lev%pFflt
        if (lev%index < pf%nlevels) then
           call lev%ulevel%factory%create_array(lev%pQ, nnodes, lev%index,  lev%lev_shape)
        end if
     end if
-
+    print *, "allocating residual"
     !>  Allocate space for residual and things need for sdc and rk
     call lev%ulevel%factory%create_array(lev%R, nnodes-1, lev%index,  lev%lev_shape)
     

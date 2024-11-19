@@ -147,9 +147,11 @@ contains
           call mpi_barrier(pf%comm%comm, ierr)
           if (pf%debug) print *,'DEBUG-rank=',pf%rank, ' past barrier at k=',k
           if (nproc > 1)  then
-             call lev%qend%pack(lev%send)    !!  Pack away your last solution
+            ! EL - quick add pf%rank
+             call lev%qend%pack(lev%send, pf%rank)    !!  Pack away your last solution
              call pf_broadcast(pf, lev%send, lev%mpibuflen, pf%comm%nproc-1)
-             call lev%q0%unpack(lev%send)    !!  Everyone resets their q0
+             ! EL - quick add pf%rank
+             call lev%q0%unpack(lev%send, pf%rank)    !!  Everyone resets their q0
           else
              call lev%q0%copy(lev%qend, flags=0)    !!  Just stick qend in q0
           end if

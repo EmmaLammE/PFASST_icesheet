@@ -207,7 +207,7 @@ contains
       c_lev => pf%levels(1)
       if(pf%save_residuals)  call pf_residual(pf, f_lev%index, dt,0)
     end if
-    !print *, '----------- done step 2 in predictor -----------------------'
+   !  print *, '----------- done step 2 in predictor -----------------------'
     !!
     !! Step 3. Do the "Burn in" step on the coarse level to make the coarse values consistent
     !!         (this is skipped if the fine initial conditions are already consistent)
@@ -273,6 +273,10 @@ contains
              call c_lev%ulevel%sweeper%sweep(pf, level_index, t0, dt, 1)
              !  Send forward
             !  print *, 'parallel sending new IC in rank ',pf%rank
+            !  call c_lev%q0%eprint()
+            !  call c_lev%qend%eprint()
+            !  call c_lev%q0%vector_size
+            !  call c_lev%qend%vector_size
              call pf_send(pf, c_lev,  c_lev%index*110000+pf%rank+1+k, .false.)
             !  print *, 'parallel sent new IC in rank ',pf%rank
           end do ! k = 1, c_lev%nsweeps_pred-1
@@ -465,9 +469,11 @@ contains
       !  print *, 'k',k,', nproc',nproc,', lev%send '
        if (k > 1) then
           if (nproc > 1)  then
-             call lev%qend%pack(lev%send)    !!  Pack away your last solution
+            ! EL - quick add pf%rank
+             call lev%qend%pack(lev%send, pf%rank)    !!  Pack away your last solution
              call pf_broadcast(pf, lev%send, lev%mpibuflen, pf%comm%nproc-1)
-             call lev%q0%unpack(lev%send)    !!  Everyone resets their q0
+             ! EL - quick add pf%rank
+             call lev%q0%unpack(lev%send, pf%rank)    !!  Everyone resets their q0
           else
              call lev%q0%copy(lev%qend, flags=0)    !!  Just stick qend in q0
           end if

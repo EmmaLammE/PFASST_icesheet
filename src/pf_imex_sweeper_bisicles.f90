@@ -428,7 +428,8 @@ contains
 
     c_AmrIceHolderPtr=pf%cptr_AmrIceHolder
     !print *,'pf_imex_bisicles_sweeper.f90 1111 c_AmrIceHolderPtr ', c_AmrIceHolderPtr
-
+   !  print *, "current rank: ",pf%rank
+   !  call EXIT(0)
     if (this%explicit) then
        !print *,'imex_sweeper_bisicles 33333 m ', m
        call pf_start_timer(pf,T_FEVAL,level_index)

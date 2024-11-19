@@ -150,13 +150,13 @@ contains
     if(present(which)) which_ = which
     if(present(stride)) stride_ = stride
     if(abs(dir_) .gt. 1) call pf_stop(__FILE__,__LINE__,'bad value for dir',val=dir_,rank=rank)
-    print*,'       in sending, rank ',pf%rank,', blocking ',blocking,', dir_ ' ,dir_,', stride_ ',stride_,',pf%comm%nproc ',pf%comm%nproc
+   !  print*,'       in sending, rank ',pf%rank,', blocking ',blocking,', dir_ ' ,dir_,', stride_ ',stride_,',pf%comm%nproc ',pf%comm%nproc
 
     ! need to wait here to make sure last non-blocking send is done
     if(blocking .eqv. .false.) then
 
        if (pf%debug) print  '("DEBUG-rank=", I5, " begin wait, level=",I4)',rank,level%index
-       print *, '       in sending, waiting for last block to be done'
+      !  print *, '       in sending, waiting for last block to be done'
        call pf_start_timer(pf, T_WAIT, level%index)
        call pf%comm%wait(pf, level%index, ierr)       
        call pf_stop_timer(pf, T_WAIT, level%index)
@@ -172,9 +172,11 @@ contains
     !  Pack the solution to send
     call pf_start_timer(pf, T_PACK, level%index)
     if(dir_ == -1) then
-       call level%q0%pack(level%send, which_)
+       ! EL - quick change from which_ to pf%rank
+       call level%q0%pack(level%send, pf%rank) 
     else
-       call level%qend%pack(level%send, which_) ! The imk encap now ignores the flag in pack and upack
+       ! EL - quick change from which_ to pf%rank
+       call level%qend%pack(level%send, pf%rank) ! The imk encap now ignores the flag in pack and upack
     end if
     call pf_stop_timer(pf, T_PACK, level%index)
 
@@ -222,7 +224,7 @@ contains
 
 
     if (pf%debug) print '("DEBUG-rank=",I5," begin recv, blocking=",L4," tag=",I8," pstatus=", I2)',rank,blocking,tag,pstatus
-    print*,'       in receiving, rank ',pf%rank,', blocking ',blocking,', dir_ ' ,dir_,', stride_ ',stride_,',pf%comm%nproc ',pf%comm%nproc
+   !  print*,'       in receiving, rank ',pf%rank,', blocking ',blocking,', dir_ ' ,dir_,', stride_ ',stride_,',pf%comm%nproc ',pf%comm%nproc
 
     source=pf%rank-(dir_)*(stride_)
     if (source < 0  .or. source > pf%comm%nproc-1) return ! if more than 1 rank, rank 0 will return here
@@ -244,10 +246,12 @@ contains
     !  Unpack solution, only rank >=1 will got here and unpack solutions
    !  print *, '       in receiving, dir_ ', dir_, ', which ',which_,', level%recv ',level%recv ! level%recv is the received soln
     call pf_start_timer(pf, T_UNPACK, level%index)
-    if (dir_ == 1) then ! dir = 1, which =1, level%recv is the H vector
-       call level%q0%unpack(level%recv, which_) ! q0 is the this in unpack
+    if (dir_ == 1) then !   EL - dir = 1, which =1, level%recv is the H vector
+       ! EL - quick change from which_ to pf%rank
+       call level%q0%unpack(level%recv, pf%rank) ! q0 is the this in unpack
     else
-       call level%qend%unpack(level%recv, which_)
+      ! EL - quick change from which_ to pf%rank
+       call level%qend%unpack(level%recv, pf%rank)
     end if
     call pf_stop_timer(pf, T_UNPACK, level%index)
   
