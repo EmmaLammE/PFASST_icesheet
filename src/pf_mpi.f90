@@ -176,11 +176,12 @@ contains
     integer,           intent(inout) :: ierror  !!  error flag
     integer,           intent(in)    :: source
     integer ::  stat(MPI_STATUS_SIZE)
-
+    ! print *, '         mpi recv ,blocking ',blocking
     if(blocking) then
        call mpi_recv(level%recv, level%mpibuflen, myMPI_Datatype, &
             source, tag, pf%comm%comm, stat, ierror)
     else
+      ! print *, '         mpi recv waiting'
        call mpi_wait(pf%comm%recvreq(level%index), stat, ierror)
     end if
   end subroutine pf_mpi_recv

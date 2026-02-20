@@ -1,18 +1,28 @@
 #  Flags for compilers and linkers on local machine
 #  This example is from GNU compilers on Linux
-FC = mpifort
-CC = mpicxx #mpicc
+FC =  ftn #mpifort #gfortran #mpifort #ftn
+CC =  CC #mpicc # CC # this is the MPICXX in chombo
 LD = $(FC)
 AR=ar rcs
 
 FFLAGS = -Ibuild -Jinclude -cpp -ffree-line-length-none
 #FFLAGS += -fno-underscoring
 # FFLAGS += -fno-leading-underscore
+
+# --------- NERSC definitions  ----------------------
+#FFLAGS = -Ibuild -Jinclude -cpp -ffree-line-length-none -fallow-argument-mismatch #-fno-second-underscore 
+# add the following mpi lib linker for nersc
+$FFLAGS += -L/opt/cray/pe/mpich/8.1.21/ofi/gnu/9.1 -lmpi
+$LDFLAGS += -L/opt/cray/pe/mpich/8.1.21/ofi/gnu/9.1 -lmpi
+$FFLAGS += -fno-underscoring
+$FFLAGS += -fno-leading-underscore
+# --------- end NERSC definitions  ----------------------
+
 #  Use this flag on newer compilers with stricter bounds checking
-# FFLAGS = -fallow-argument-mismatch
+# FFLAGS += -fallow-argument-mismatch
 
 ifeq ($(DEBUG),TRUE)
-FFLAGS += -fcheck=all -fbacktrace -g -ffpe-trap=invalid,zero,overflow -fbounds-check -fimplicit-none -ffree-line-length-none
+FFLAGS += -fcheck=all -fbacktrace -Wall -g -ffpe-trap=invalid,zero,overflow -fbounds-check -fimplicit-none -ffree-line-length-none
 else
 FFLAGS += -O3 
 endif

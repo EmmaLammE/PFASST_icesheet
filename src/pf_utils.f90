@@ -26,14 +26,21 @@ contains
     call pf_start_timer(pf, T_RESIDUAL,level_index)
 
     lev => pf%levels(level_index)
-    call lev%ulevel%sweeper%residual(pf,level_index, dt, flag)
-
+    ! print *,'    in pf_residual calling sweeper residual, level index ',level_index,' lev%nnodes ',lev%nnodes,', flag ',flag
+    call lev%ulevel%sweeper%residual(pf,level_index, dt, flag) ! in pf_bisicles_sweeper.f90
+    ! print *,'    in pf_residual done sweeper residual'
+    ! call lev%Q(1)%eprint()
+    ! print *,'    in pf_residual lev%Q(1)', lev%Q(1)
     ! compute max residual norm
     !   sol_norms(1) = lev%Q(1)%norm(flag) ! for adjoint
-     sol_norms = lev%Q(1)%norm(flag) ! for adjoint    
+    ! print *, 'done printing'
+     sol_norms = lev%Q(1)%norm(flag) ! for adjoint ! this is in bisicles norm 
+    !  print *, 'done lev%Q(1)%norm(flag) '   
 !    do m = 1, lev%nnodes-1
 !       res_norms(m) = lev%R(m)%norm(flag)
-       res_norms = lev%R(lev%nnodes-1)%norm(flag)
+      !  print *,'    in pf_residual done Q(1) norm'
+       res_norms = lev%R(lev%nnodes-1)%norm(flag) ! the norm defined in bisicles_vector
+      !  print *,'    in pf_residual done R(lev%nnodes-1) norm'
        !       sol_norms(m+1) = lev%Q(m+1)%norm(flag) ! only the value at lev%nnodes is needed for forward integration, right?
 !       sol_norms(m+1) = sol_norms(1) ! only the value at lev%nnodes is needed for forward integration, right?        
 !    end do
@@ -42,14 +49,16 @@ contains
     m = lev%nnodes  ! for usual forward integration
     if(present(flag)) then
       if(flag==2) m = 1
-
     end if
+
     lev%residual = maxval(res_norms)    
     if (sol_norms(m) > 0.0d0) then
        lev%residual_rel = lev%residual/sol_norms(m)
     else
        lev%residual_rel = 0.0d0
     end if
+
+    ! print *,'    in pf_residual before resid'
 
     call pf_set_resid(pf,lev%index,lev%residual)
     
