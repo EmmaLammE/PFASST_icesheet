@@ -182,7 +182,8 @@ contains
          !  print *, '  sweeper before adding lev%I '
          !  call lev%I(m)%eprint()
          !  call this%rhs%eprint()
-         !  call this%rhs%axpy(1.0_pfdp, lev%I(m))
+          ! Include the deferred correction and any coarse-level FAS term.
+          call this%rhs%axpy(1.0_pfdp, lev%I(m))
           !call this%rhs%eprint()
 
           !>  Add the starting value
