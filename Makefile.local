@@ -1,11 +1,12 @@
 #  Flags for compilers and linkers on local machine
 #  This example is from GNU compilers on Linux
-FC =  ftn #mpifort #gfortran #mpifort #ftn
-CC =  CC #mpicc # CC # this is the MPICXX in chombo
+FC =  mpifort #mpifort #gfortran #mpifort #ftn
+CC =  mpicc  #mpicc # CC # this is the MPICXX in chombo
 LD = $(FC)
 AR=ar rcs
 
 FFLAGS = -Ibuild -Jinclude -cpp -ffree-line-length-none
+# FFLAGS = -Ibuild -Jinclude -cpp -ffree-line-length-none -fallow-argument-mismatch
 #FFLAGS += -fno-underscoring
 # FFLAGS += -fno-leading-underscore
 
