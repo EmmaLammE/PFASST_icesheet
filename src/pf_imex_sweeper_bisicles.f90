@@ -29,6 +29,9 @@ module pf_mod_imex_sweeper_bisicles
    contains
      procedure(pf_f_eval_p), deferred :: f_eval   !!  RHS function evaluations
      procedure(pf_f_comp_p), deferred :: f_comp   !!  Implicit solver
+     ! Optional state constraints.  Existing sweepers retain their old behavior.
+     procedure :: project_solution => imex_bisicles_project_solution
+     procedure :: f_eval_implicit => imex_bisicles_f_eval_implicit
      !>  Set the generic functions
      procedure :: sweep      => imex_bisicles_sweep
      procedure :: initialize => imex_bisicles_initialize
@@ -133,42 +136,33 @@ contains
 
        !  Add the tau FAS correction
        if (level_index < pf%state%finest_level) then
-          do m = 1, lev%nnodes-1
-             call lev%I(m)%axpy(1.0_pfdp, lev%tauQ(m))
-             if (m>1 .and. pf%use_Sform) then
-                call lev%I(m)%axpy(-1.0_pfdp, lev%tauQ(m-1))
-             end if
-          end do
-       end if
-       
-       !  Recompute the first function value if this is first sweep
-       if (k .eq. 1) then ! k=1
-          !print *,'imex_sweeper_bisicles 1111111 '
-          call lev%Q(1)%copy(lev%q0)
-          if (this%explicit) then
-             call pf_start_timer(pf,T_FEVAL,level_index)
-             !print *,'imex_sweeper_bisicles 222222222 '
-             call this%f_eval(lev%Q(1), t0, level_index, lev%F(1,1),c_AmrIceHolderPtr)
-             call pf_stop_timer(pf,T_FEVAL,level_index)
-          end if
-          
-          if (this%implicit) then
-             call pf_start_timer(pf,T_FEVAL,level_index)
-              call this%f_eval(lev%Q(1), t0, level_index, lev%F(1,2),c_AmrIceHolderPtr)
-             call pf_stop_timer(pf,T_FEVAL,level_index)
-          end if
-       end if
-      !  print *, '  sweeper Recompute the first function value'
+         do m = 1, lev%nnodes-1
+            call lev%I(m)%axpy(1.0_pfdp, lev%tauQ(m))
+            if (m>1 .and. pf%use_Sform) then
+               call lev%I(m)%axpy(-1.0_pfdp, lev%tauQ(m-1))
+            end if
+         end do
+      end if
+      
+      !  Recompute the first function value if this is first sweep
+      if (k .eq. 1) then ! k=1
+         ! A received or corrected initial condition must obey the same
+         ! constraint as the collocation states before it enters a sweep.
+         call this%project_solution(lev%q0, t0, level_index, c_AmrIceHolderPtr)
+         call lev%Q(1)%copy(lev%q0)
+         call this%evaluate(pf, level_index, t0, 1)
+      end if
+     !  print *, '  sweeper Recompute the first function value'
 
-       t = t0
-       ! do the sub-stepping in sweep
+      t = t0
+      ! do the sub-stepping in sweep
 
-       substeps: do m = 1, lev%nnodes-1  !!  Loop over substeps
-      !  print *, '  sweeper ------ adding rhs to q !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 2 m',m
-          t = t + dt*this%dtsdc(m)
+      substeps: do m = 1, lev%nnodes-1  !!  Loop over substeps
+     !  print *, '  sweeper ------ adding rhs to q !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 2 m',m
+         t = t + dt*this%dtsdc(m)
 
-          this%m_sub=m
-          !>  Accumulate rhs
+         this%m_sub=m
+         !>  Accumulate rhs
           call this%rhs%setval(0.0_pfdp)
           do n = 1, m
              if (this%explicit) &
@@ -210,7 +204,10 @@ contains
              !call lev%Q(m+1)%eprint()
              !call ABORT
           end if
-          !>  Compute explicit function on new value
+          !>  Compute explicit function on the admissible new value.  The
+          ! implicit solve already returned F(:,2); do not replace its
+          ! reaction with a pointwise evaluation of the explicit physics.
+          call this%project_solution(lev%Q(m+1), t, level_index, c_AmrIceHolderPtr)
          !  print *, '  sweeper before f_eval'
           if (this%explicit) then
             !  print *,'  sweeper level index ',level_index
@@ -347,27 +344,30 @@ contains
 
   !> Subroutine to compute  Residual
   subroutine imex_bisicles_residual(this, pf, level_index, dt, flags)
-    class(pf_imex_sweeper_bisicles_t),  intent(inout) :: this
-    type(pf_pfasst_t), intent(inout),target :: pf    !!  PFASST structure
-    integer,           intent(in)    :: level_index  !!  level on which to initialize
-    real(pfdp),        intent(in   ) :: dt           !!  Time step
-    integer, intent(in), optional   :: flags
+   class(pf_imex_sweeper_bisicles_t),  intent(inout) :: this
+   type(pf_pfasst_t), intent(inout),target :: pf    !!  PFASST structure
+   integer,           intent(in)    :: level_index  !!  level on which to initialize
+   real(pfdp),        intent(in   ) :: dt           !!  Time step
+   integer, intent(in), optional   :: flags
 
-    integer :: m
-    type(pf_level_t), pointer :: lev        !  Current level
-    lev => pf%levels(level_index)   !  Assign level pointer
-    !print *, 'begin integrate in residual..... lev%nnodes-1 dt ',lev%nnodes-1, dt
-    !print *, '   lev%I(2) before integrate '
-    !call lev%I(2)%eprint()
-    call imex_bisicles_integrate(this,pf,level_index, lev%Q, lev%F, dt, lev%I, flags)
-    !print *, '   lev%I(2) after integrate '
-    !call lev%I(2)%eprint()
-    !> add tau if it exists
-    if (lev%index < pf%state%finest_level) then    
-       do m = 1, lev%nnodes-1
-          call lev%I(m)%axpy(1.0_pfdp, lev%tauQ(m), flags)
-       end do
-    end if
+   integer :: m
+   type(pf_level_t), pointer :: lev        !  Current level
+   lev => pf%levels(level_index)   !  Assign level pointer
+   ! A V-cycle can receive/correct q0 after its last fine-grid evaluation.
+   ! Keep that initial state admissible without projecting signed residuals.
+   call this%project_solution(lev%q0, pf%state%t0, level_index, pf%cptr_AmrIceHolder)
+   !print *, 'begin integrate in residual..... lev%nnodes-1 dt ',lev%nnodes-1, dt
+   !print *, '   lev%I(2) before integrate '
+   !call lev%I(2)%eprint()
+   call imex_bisicles_integrate(this,pf,level_index, lev%Q, lev%F, dt, lev%I, flags)
+   !print *, '   lev%I(2) after integrate '
+   !call lev%I(2)%eprint()
+   !> add tau if it exists
+   if (lev%index < pf%state%finest_level) then    
+      do m = 1, lev%nnodes-1
+         call lev%I(m)%axpy(1.0_pfdp, lev%tauQ(m), flags)
+      end do
+   end if
     do m = 1, lev%nnodes-1    
        !print *,'imex_sweeper_bisicles 44444 '  
        call lev%R(m)%copy(lev%I(m))
@@ -387,28 +387,29 @@ contains
     end do
     
 !    call pf_generic_residual(this, pf, level_index, dt)
-  end subroutine imex_bisicles_residual
+   end subroutine imex_bisicles_residual
 
 
-  subroutine imex_bisicles_spreadq0(this, pf,level_index, t0, flags, step)
-    class(pf_imex_sweeper_bisicles_t),  intent(inout) :: this
-    type(pf_pfasst_t), intent(inout),target :: pf    !!  PFASST structure
-    integer,           intent(in)    :: level_index  !!  level on which to initialize
-    real(pfdp),        intent(in   ) :: t0
-    integer, optional,   intent(in)    :: flags, step
-
-    call pf_generic_spreadq0(this, pf,level_index, t0)
-  end subroutine imex_bisicles_spreadq0
-
-  subroutine imex_bisicles_compute_dt(this,pf,level_index,  t0, dt,flags)
-    class(pf_imex_sweeper_bisicles_t),  intent(inout) :: this
-    type(pf_pfasst_t), target, intent(inout) :: pf
-    integer,              intent(in)    :: level_index
-    real(pfdp),        intent(in   ) :: t0
-    real(pfdp),        intent(inout) :: dt
-    integer, optional,   intent(in)    :: flags
-
-    type(pf_level_t),    pointer :: lev
+   subroutine imex_bisicles_spreadq0(this, pf,level_index, t0, flags, step)
+     class(pf_imex_sweeper_bisicles_t),  intent(inout) :: this
+     type(pf_pfasst_t), intent(inout),target :: pf    !!  PFASST structure
+     integer,           intent(in)    :: level_index  !!  level on which to initialize
+     real(pfdp),        intent(in   ) :: t0
+     integer, optional,   intent(in)    :: flags, step
+ 
+     call this%project_solution(pf%levels(level_index)%q0, t0, level_index, pf%cptr_AmrIceHolder)
+     call pf_generic_spreadq0(this, pf,level_index, t0)
+   end subroutine imex_bisicles_spreadq0
+ 
+   subroutine imex_bisicles_compute_dt(this,pf,level_index,  t0, dt,flags)
+     class(pf_imex_sweeper_bisicles_t),  intent(inout) :: this
+     type(pf_pfasst_t), target, intent(inout) :: pf
+     integer,              intent(in)    :: level_index
+     real(pfdp),        intent(in   ) :: t0
+     real(pfdp),        intent(inout) :: dt
+     integer, optional,   intent(in)    :: flags
+ 
+     type(pf_level_t),    pointer :: lev
     lev => pf%levels(level_index)   !!  Assign level pointer
     !  Do nothing now, only example of compute dt is in pf_verlet_sweeper.f90 in pfasst
     return
@@ -416,46 +417,77 @@ contains
 
   !> Subroutine to evaluate function value at node m
   subroutine imex_bisicles_evaluate(this, pf,level_index, t, m, flags, step)
-    class(pf_imex_sweeper_bisicles_t),  intent(inout) :: this
-    type(pf_pfasst_t), intent(inout),target :: pf    !!  PFASST structure
-    integer,           intent(in)    :: level_index  !!  level on which to initialize
-    real(pfdp),        intent(in   ) :: t    !!  Time at which to evaluate
-    integer,           intent(in   ) :: m    !!  Node at which to evaluate
-    integer, intent(in), optional   :: flags, step
+   class(pf_imex_sweeper_bisicles_t),  intent(inout) :: this
+   type(pf_pfasst_t), intent(inout),target :: pf    !!  PFASST structure
+   integer,           intent(in)    :: level_index  !!  level on which to initialize
+   real(pfdp),        intent(in   ) :: t    !!  Time at which to evaluate
+   integer,           intent(in   ) :: m    !!  Node at which to evaluate
+   integer, intent(in), optional   :: flags, step
 
-    type(pf_level_t), pointer :: lev        !  Current level
-    type(c_ptr)      :: c_AmrIceHolderPtr
-    lev => pf%levels(level_index)   !  Assign level pointer
+   type(pf_level_t), pointer :: lev        !  Current level
+   type(c_ptr)      :: c_AmrIceHolderPtr
+   lev => pf%levels(level_index)   !  Assign level pointer
 
-    c_AmrIceHolderPtr=pf%cptr_AmrIceHolder
-    !print *,'pf_imex_bisicles_sweeper.f90 1111 c_AmrIceHolderPtr ', c_AmrIceHolderPtr
-   !  print *, "current rank: ",pf%rank
-   !  call EXIT(0)
-    if (this%explicit) then
-       !print *,'imex_sweeper_bisicles 33333 m ', m
-       call pf_start_timer(pf,T_FEVAL,level_index)
-       !call pf%levels(level_index)%Q(2)%eprint()
-       call this%f_eval(lev%Q(m), t, level_index, lev%F(m,1),c_AmrIceHolderPtr)
-       call pf_stop_timer(pf,T_FEVAL,level_index)
-    end if
-    
-    if (this%implicit) then
-       call pf_start_timer(pf,T_FEVAL,level_index)       
-       call this%f_eval(lev%Q(m), t, level_index, lev%F(m,2),c_AmrIceHolderPtr)
-       call pf_stop_timer(pf,T_FEVAL,level_index)
-    end if
-    
-  end subroutine imex_bisicles_evaluate
+   c_AmrIceHolderPtr=pf%cptr_AmrIceHolder
+   ! This entry point is also used after coarse/fine time transfers, whose
+   ! signed corrections need not preserve the solution constraint.
+   call this%project_solution(lev%Q(m), t, level_index, c_AmrIceHolderPtr)
+   !print *,'pf_imex_bisicles_sweeper.f90 1111 c_AmrIceHolderPtr ', c_AmrIceHolderPtr
+  !  print *, "current rank: ",pf%rank
+  !  call EXIT(0)
+   if (this%explicit) then
+      !print *,'imex_sweeper_bisicles 33333 m ', m
+      call pf_start_timer(pf,T_FEVAL,level_index)
+      !call pf%levels(level_index)%Q(2)%eprint()
+      call this%f_eval(lev%Q(m), t, level_index, lev%F(m,1),c_AmrIceHolderPtr)
+      call pf_stop_timer(pf,T_FEVAL,level_index)
+   else
+      call lev%F(m,1)%setval(0.0_pfdp)
+   end if
+   
+   if (this%implicit) then
+      call pf_start_timer(pf,T_FEVAL,level_index)       
+      ! At the initial node a constraint reaction is determined from the
+      ! explicit tendency.  At later nodes its override may retain the
+      ! solve-produced reaction on the active set after a transfer.
+      call this%f_eval_implicit(lev%Q(m), t, level_index, lev%F(m,1), &
+                               lev%F(m,2), c_AmrIceHolderPtr, m == 1)
+      call pf_stop_timer(pf,T_FEVAL,level_index)
+   end if
+   
+ end subroutine imex_bisicles_evaluate
 
-  !> Subroutine to evaluate the function values at all nodes
-  subroutine imex_bisicles_evaluate_all(this, pf,level_index, t, flags, step)
-    class(pf_imex_sweeper_bisicles_t),  intent(inout) :: this
-    type(pf_pfasst_t), intent(inout),target :: pf    !!  PFASST structure
-    integer,           intent(in)    :: level_index  !!  level on which to initialize
-    real(pfdp),        intent(in   ) :: t(:)  !!  Array of times at each node
-    integer, intent(in), optional   :: flags, step
-    
-    call pf_generic_evaluate_all(this, pf,level_index, t)
-  end subroutine imex_bisicles_evaluate_all
+ !> Subroutine to evaluate the function values at all nodes
+ subroutine imex_bisicles_evaluate_all(this, pf,level_index, t, flags, step)
+   class(pf_imex_sweeper_bisicles_t),  intent(inout) :: this
+   type(pf_pfasst_t), intent(inout),target :: pf    !!  PFASST structure
+   integer,           intent(in)    :: level_index  !!  level on which to initialize
+   real(pfdp),        intent(in   ) :: t(:)  !!  Array of times at each node
+   integer, intent(in), optional   :: flags, step
+   
+   call pf_generic_evaluate_all(this, pf,level_index, t)
+ end subroutine imex_bisicles_evaluate_all
+
+ !> Default projection is a no-op so unconstrained applications are unchanged.
+ subroutine imex_bisicles_project_solution(this, y, t, level_index, c_AmrIceHolderPtr)
+   class(pf_imex_sweeper_bisicles_t), intent(inout) :: this
+   class(pf_encap_t), intent(inout) :: y
+   real(pfdp), intent(in) :: t
+   integer, intent(in) :: level_index
+   type(c_ptr), intent(in) :: c_AmrIceHolderPtr
+ end subroutine imex_bisicles_project_solution
+
+ !> Preserve the legacy implicit evaluation unless the application supplies
+ ! a distinct implicit term (such as a thickness-constraint reaction).
+ subroutine imex_bisicles_f_eval_implicit(this, y, t, level_index, f_exp, f, c_AmrIceHolderPtr, at_start)
+   class(pf_imex_sweeper_bisicles_t), intent(inout) :: this
+   class(pf_encap_t), intent(in) :: y, f_exp
+   class(pf_encap_t), intent(inout) :: f
+   real(pfdp), intent(in) :: t
+   integer, intent(in) :: level_index
+   type(c_ptr), intent(in) :: c_AmrIceHolderPtr
+   logical, intent(in) :: at_start
+   call this%f_eval(y, t, level_index, f, c_AmrIceHolderPtr)
+ end subroutine imex_bisicles_f_eval_implicit
 
 end module pf_mod_imex_sweeper_bisicles
